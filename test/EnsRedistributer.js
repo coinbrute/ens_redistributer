@@ -1,9 +1,114 @@
-const { expect } = require("chai")
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
 
 const tokens = (n) => {
   return ethers.utils.parseUnits(n.toString(), 'ether')
 }
 
 describe("ENSRedistributer", () => {
+  let ensRedistributer;
+  let deployer, owner1;
 
+  const NAME = "ENS Redistributer";
+  const SYMBOL = "ENSR";
+
+  beforeEach(async () => {
+    // setup accounts
+    [deployer, owner1] = await ethers.getSigners();
+
+    // deploy contract
+    const ENSRedistributer = await ethers.getContractFactory("ENSRedistributer");
+    ensRedistributer = await ENSRedistributer.deploy(NAME, SYMBOL);
+
+    // list a domain
+    const transaction = await ensRedistributer.connect(deployer).list("drew.eth", tokens(10));
+    await transaction.wait();
+  });
+
+  describe("Deployment", () => {
+    it("Sets the name", async () => {
+      const result = await ensRedistributer.name();
+      expect(result).to.equal(NAME);
+    });
+
+    it("Sets the symbol", async () => {
+      const result = await ensRedistributer.symbol();
+      expect(result).to.equal(SYMBOL);
+    });
+
+    it("Sets the owner", async () => {
+      const result = await ensRedistributer.owner();
+      expect(result).to.equal(owner1);
+    });
+
+    it("Returns the max supply", async () => {
+      const result = await ensRedistributer.maxSupply();
+      expect(result).to.equal(1);
+    });
+
+    it("Returns the total supply", async () => {
+      const result = await ensRedistributer.totalSupply();
+      expect(result).to.equal(0);
+    });
+  });
+
+  describe("Domain", () => {
+    it("Returns domain attributes", async () => {
+      const domain = await ensRedistributer.getDomain(1);
+      expect(domain.name).to.be.equal("drew.eth");
+      expect(domain.cost).to.be.equal(tokens(10));
+      expect(domain.isOwned).to.be.equal(false);
+    });
+  });
+
+  describe("Minting", () => {
+    const ID = 1;
+    const AMOUNT = ethers.utils.parseUnits("10", 'ether');
+
+    beforeEach(async () => {
+      const tx = await ensRedistributer.connect(owner1).mint(ID, {value: AMOUNT});
+      await tx.wait();
+    });
+
+    it("Updates the owner", async () => {
+      const owner = await ensRedistributer.ownerOf(ID);
+      expect(owner).to.be.equal(owner1.address);
+    });
+
+    it("Updates the domain status", async () => {
+      const domain = await ensRedistributer.getDomain(ID);
+      expect(domain.isOwned).to.be.equal(true);
+    });
+
+    it("Updates the contract balance", async () => {
+      const result = await ensRedistributer.getBalance();
+      expect(result).to.be.equal(AMOUNT);
+    });
+  });
+
+  describe("Withdrawing", () => {
+    const ID = 1;
+    const AMOUNT = ethers.utils.parseUnits("10", 'ether');
+    let balanceBefore;
+
+    beforeEach(async () => {
+      balanceBefore = await ethers.provider.getBalance(deployer.address);
+
+      let tx = await ensRedistributer.connect(owner1).mint(ID, {value: AMOUNT});
+      await tx.wait();
+
+      tx = await ensRedistributer.connect(deployer).withdraw();
+      await tx.wait();
+    });
+
+    it("Updates the owner balance", async () => {
+      const balanceAfter = await ethers.provider.getBalance(deployer.address);
+      expect(balanceAfter).to.be.greaterThan(balanceBefore);
+    });
+
+    it("Updates the contract balance", async () => {
+      const result = await ensRedistributer.getBalance();
+      expect(result).to.equal(0);
+    });
+  });
 })
