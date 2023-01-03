@@ -38,7 +38,7 @@ describe("ENSRedistributer", () => {
 
     it("Sets the owner", async () => {
       const result = await ensRedistributer.owner();
-      expect(result).to.equal(owner1);
+      expect(result).to.equal(deployer.address);
     });
 
     it("Returns the max supply", async () => {

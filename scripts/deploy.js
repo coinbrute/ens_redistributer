@@ -11,7 +11,28 @@ const tokens = (n) => {
 }
 
 async function main() {
+  // Setup accounts & variables
+  const [deployer] = await ethers.getSigners()
+  const NAME = "ENS Redistributer"
+  const SYMBOL = "ENSR"
 
+  // Deploy contract
+  const ENSRedistributer = await ethers.getContractFactory("ENSRedistributer")
+  const ensRedistributer = await ENSRedistributer.deploy(NAME, SYMBOL)
+  await ensRedistributer.deployed();
+
+  console.log(`Deployed Domain Contract at: ${ensRedistributer.address}\n`)
+
+  // List 6 domains
+  const names = ["a.eth", "b.eth", "c.eth", "d.eth", "e.eth", "f.eth"]
+  const costs = [tokens(10), tokens(25), tokens(15), tokens(2.5), tokens(3), tokens(1)]
+
+  for (var i = 0; i < 6; i++) {
+    const transaction = await ensRedistributer.connect(deployer).list(names[i], costs[i])
+    await transaction.wait()
+
+    console.log(`Listed Domain ${i + 1}: ${names[i]}`)
+  }
 }
 
 main().catch((error) => {
